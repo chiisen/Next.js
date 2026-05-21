@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## 專案概述
 
-支付系統復刻專案，基於原 Laravel + Vue 專案評估後的 Next.js 重構方案。
+支付系統專案，基於原專案評估後的 Next.js 重構方案。
 
 ## 技術棧
 
@@ -37,76 +37,34 @@ npm run test:watch  # watch 模式（檔案異動自動重跑）
 npx vitest run src/lib/xxx.ts  # 測試特定檔案
 ```
 
-## 專案結構 (App Router)
+## 專案結構
 
 ```
 next-js/
-├── app/                      # App Router
-│   ├── layout.tsx           # 根佈局
-│   ├── page.tsx             # 首頁
-│   ├── globals.css          # 全域樣式
-│   └── favicon.ico
+├── app/                      # Next.js App Router
 ├── public/                  # 靜態資源
-├── prisma/                  # 待建立：Prisma Schema
-└── src/                     # 待建立：非 App Router 程式碼
-    ├── lib/                 # 工具函式、服務
-    ├── components/          # 元件
-    └── types/               # TypeScript 類型
+├── prisma/                  # Prisma Schema
+├── src/                     # 應用程式碼
+│   ├── lib/                 # 工具函式、服務
+│   ├── components/          # 元件
+│   └── types/               # TypeScript 類型
+└── docs/                    # 文件
 ```
 
-## 核心商業邏輯模組
+## 文件索引
 
-| 模組 | 說明 |
+| 文件 | 內容 |
 |------|------|
-| **代收 (Deposit)** | 商戶發起收款請求 → 系統分配銀行帳號 → 等待客戶轉帳 → 撮合訂單 |
-| **代付 (Withdraw)** | 商戶發起付款請求 → 管理員審核 → 扣款 → 第三方金流代付 |
-| **銀行帳號管理** | BankAccount + BankAccountGroup + BAM 監控整合 |
-| **撮合系統** | UTR 精確匹配 / 姓名+金額匹配 / 唯一金額匹配 |
-| **代理佣金** | 三層級佣金鏈 (Merchant → Agent → Super_Agent) |
-| **費率引擎** | FeeGroup + FeeRule，支援 Percentage/Fixed 計費 |
-| **Channel 整合** | 多支付通道適配器 (PayPay, HK21Pay, VanPay, ColaPay 等) |
-| **風控** | Blacklist 黑名單過濾 |
-
-## API 端點
-
-| 端點 | 用途 |
-|------|------|
-| `POST /api/deposit/payment` | 代收請求 |
-| `POST /api/withdraw/request` | 代付請求 |
-| `GET /api/order/query` | 訂單查詢 |
-| `GET /api/balance/query` | 餘額查詢 |
-| `POST /api/deposit/{slug}/notify` | 代收回調 |
-| `POST /api/withdraw/{slug}/notify` | 代付回調 |
-
-## 資料模型
-
-```
-users (商戶/代理/超級代理)
-├── deposits (代收訂單)
-├── withdraws (代付訂單)
-├── cash_books (現金帳本)
-├── cash_records (現金異動)
-└── user_channel_configs (商戶通道配置)
-
-bank_accounts (系統銀行帳號)
-├── bank_account_groups (帳號分組)
-├── bam_hosts (BAM 主機)
-└── banks (銀行資料)
-
-channels (支付通道)
-├── channel_settings (通道設定)
-├── agent_channel_configs (代理通道費率)
-└── payments (支付工具)
-
-agent_commissions (代理佣金)
-├── agent_commission_snapshots (佣金快照)
-└── fee_groups / fee_rules (費率規則)
-```
+| [商業邏輯](./docs/business-logic.md) | 核心商業邏輯模組說明 |
+| [資料模型](./docs/data-model.md) | 資料庫模型結構 |
+| [API 端點](./docs/api-endpoints.md) | API 端點列表 |
+| [Vitest 測試指南](./docs/vitest-guide.md) | 單元測試使用說明 |
+| [Agent 工作流程](./docs/agent-workflow.md) | AI Agent 工作目錄規則 |
 
 ## 建構順序
 
 1. 安裝 shadcn/ui + Prisma + NextAuth.js
-2. 建立 Prisma Schema（遷移自原 Laravel Migrations）
+2. 建立 Prisma Schema（遷移自原專案的資料庫 Schema）
 3. 實作認證層
 4. 建立商業邏輯模組
 5. 串接支付通道
