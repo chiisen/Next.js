@@ -128,7 +128,18 @@ npm run lint
 
 # 測試
 npm run test
+
+# Prisma Studio（圖形化資料庫管理介面）
+npx prisma studio
+# 開啟 http://localhost:5555
 ```
+
+## 工具服務
+
+| 服務 | 網址 | 說明 |
+|------|------|------|
+| Prisma Studio | http://localhost:5555 | 圖形化資料庫管理介面 |
+| 開發伺服器 | http://localhost:3000 | Next.js 應用 |
 
 ## 文件
 
@@ -139,4 +150,4 @@ npm run test
 ---
 
 *專案建立日期：2026-05-21*
-*最後更新：2026-05-23*
+*最後更新：2026-05-24*
