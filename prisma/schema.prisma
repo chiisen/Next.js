@@ -2,12 +2,12 @@
 // 對應 docs/data-model.md 的資料模型結構
 
 generator client {
-  provider = "prisma-client"
-  output   = "../app/generated/prisma"
+  provider = "prisma-client-js"
 }
 
 datasource db {
   provider = "postgresql"
+  url      = env("DATABASE_URL")
 }
 
 model User {
@@ -117,6 +117,7 @@ model CashBook {
   refId       String?
   note        String?
   createdAt   DateTime    @default(now())
+  cashRecords CashRecord[]
 
   @@map("cash_books")
 }
@@ -210,6 +211,8 @@ model Channel {
   deposits    Deposit[]
   withdraws   Withdraw[]
   payments    Payment[]
+  channelSettings ChannelSetting[]
+  agentConfigs AgentChannelConfig[]
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
 
@@ -286,6 +289,7 @@ model FeeGroup {
   rules       FeeRule[]
   agentConfigs AgentChannelConfig[]
   userConfigs  UserChannelConfig[]
+  agentCommissions AgentCommission[]
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
 
@@ -323,6 +327,8 @@ model AgentCommission {
   rate            Decimal
   amount          Decimal
   status          String   @default("pending")
+  feeGroupId      String?
+  feeGroup        FeeGroup? @relation(fields: [feeGroupId], references: [id])
   createdAt      DateTime @default(now())
   settledAt       DateTime?
 
