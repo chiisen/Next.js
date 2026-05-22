@@ -201,6 +201,35 @@ src/
 
 Vitest 輸出格式相容 JUnit，可透過 `--reporter=junit` 產生 CI 所需格式。
 
+### API 測試範例
+
+```typescript
+// tests/api/deposit.test.ts
+import { describe, it, expect, vi, beforeEach } from "vitest";
+import { GET, POST } from "@/app/api/deposit/route";
+import { NextRequest } from "next/server";
+
+vi.mock("@/lib/prisma", () => ({
+  prisma: {
+    deposit: {
+      findMany: vi.fn(),
+      create: vi.fn(),
+    },
+  },
+}));
+
+describe("Deposit API", () => {
+  it("should return deposit list", async () => {
+    const mockDeposits = [{ id: "1", orderNo: "D123", amount: 1000 }];
+    const { prisma } = await import("@/lib/prisma");
+    vi.mocked(prisma.deposit.findMany).mockResolvedValue(mockDeposits as any);
+
+    const response = await GET(new NextRequest("http://localhost/api/deposit"));
+    expect(response.status).toBe(200);
+  });
+});
+```
+
 ---
 
-*建立日期：2026-05-21*
+*最後更新：2026-05-23*
