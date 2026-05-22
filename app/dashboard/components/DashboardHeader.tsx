@@ -2,6 +2,7 @@
 
 import { signOut } from 'next-auth/react';
 import { Button } from '@/components/ui/button';
+import { ThemeToggle } from './ThemeToggle';
 
 interface DashboardHeaderProps {
   user: {
@@ -15,14 +16,17 @@ export function DashboardHeader({ user }: DashboardHeaderProps) {
   return (
     <header className="flex items-center justify-between px-6 py-4 bg-white border-b dark:bg-zinc-900 dark:border-zinc-800">
       <div>
-        <h1 className="text-xl font-semibold">支付系統</h1>
+        <h1 className="text-xl font-semibold text-foreground">支付系統</h1>
         <p className="text-sm text-muted-foreground">
           {user.name || user.email} · {user.role}
         </p>
       </div>
-      <Button variant="outline" onClick={() => signOut({ callbackUrl: '/login' })}>
-        登出
-      </Button>
+      <div className="flex items-center gap-4">
+        <ThemeToggle />
+        <Button variant="outline" onClick={() => signOut({ callbackUrl: '/login' })}>
+          登出
+        </Button>
+      </div>
     </header>
   );
 }
