@@ -1,0 +1,362 @@
+// Prisma Schema for Payment System
+// 對應 docs/data-model.md 的資料模型結構
+
+generator client {
+  provider = "prisma-client"
+  output   = "../app/generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+model User {
+  id            String    @id @default(cuid())
+  email         String    @unique
+  password      String
+  name          String?
+  role          UserRole  @default(MERCHANT)
+  parentId      String?
+  parent        User?     @relation("UserHierarchy", fields: [parentId], references: [id])
+  children      User[]    @relation("UserHierarchy")
+  balance       Decimal   @default(0)
+  frozenBalance Decimal   @default(0)
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  deposits              Deposit[]
+  withdraws             Withdraw[]
+  cashBooks             CashBook[]
+  userChannelConfigs    UserChannelConfig[]
+
+  @@map("users")
+}
+
+enum UserRole {
+  MERCHANT
+  AGENT
+  SUPER_AGENT
+  ADMIN
+}
+
+model Deposit {
+  id              String        @id @default(cuid())
+  orderNo         String        @unique
+  merchantId      String
+  merchant        User          @relation(fields: [merchantId], references: [id])
+  amount          Decimal
+  currency        String        @default("TWD")
+  status          DepositStatus @default(PENDING)
+  bankAccountId   String?
+  bankAccount     BankAccount?  @relation(fields: [bankAccountId], references: [id])
+  channelId       String?
+  channel         Channel?      @relation(fields: [channelId], references: [id])
+  callbackUrl     String?
+  callbackStatus  String?
+  utr             String?
+  payerName       String?
+  createdAt       DateTime      @default(now())
+  updatedAt       DateTime      @updatedAt
+  matchedAt       DateTime?
+  completedAt     DateTime?
+
+  @@map("deposits")
+}
+
+enum DepositStatus {
+  PENDING
+  MATCHING
+  COMPLETED
+  FAILED
+  CANCELLED
+}
+
+model Withdraw {
+  id            String          @id @default(cuid())
+  orderNo       String          @unique
+  merchantId    String
+  merchant      User            @relation(fields: [merchantId], references: [id])
+  amount        Decimal
+  currency      String          @default("TWD")
+  status        WithdrawStatus @default(PENDING)
+  bankAccountId String?
+  channelId     String?
+  channel       Channel?        @relation(fields: [channelId], references: [id])
+  callbackUrl   String?
+  bankName      String?
+  bankAccount   String?
+  accountName   String?
+  createdAt     DateTime        @default(now())
+  updatedAt     DateTime        @updatedAt
+  reviewedAt    DateTime?
+  reviewedBy    String?
+  completedAt   DateTime?
+
+  @@map("withdraws")
+}
+
+enum WithdrawStatus {
+  PENDING
+  PENDING_REVIEW
+  APPROVED
+  REJECTED
+  PROCESSING
+  COMPLETED
+  FAILED
+}
+
+model CashBook {
+  id          String      @id @default(cuid())
+  userId      String
+  user        User        @relation(fields: [userId], references: [id])
+  type        CashBookType
+  amount      Decimal
+  balanceBefore Decimal
+  balanceAfter  Decimal
+  refType     String?
+  refId       String?
+  note        String?
+  createdAt   DateTime    @default(now())
+
+  @@map("cash_books")
+}
+
+enum CashBookType {
+  DEPOSIT
+  WITHDRAW
+  COMMISSION
+  ADJUSTMENT
+  FREEZE
+  UNFREEZE
+}
+
+model CashRecord {
+  id          String   @id @default(cuid())
+  cashBookId  String
+  cashBook    CashBook @relation(fields: [cashBookId], references: [id])
+  type        String
+  amount      Decimal
+  createdAt   DateTime @default(now())
+
+  @@map("cash_records")
+}
+
+model BankAccount {
+  id              String    @id @default(cuid())
+  accountNo       String    @unique
+  accountName     String
+  bankId          String
+  bank            Bank      @relation(fields: [bankId], references: [id])
+  groupId         String?
+  group           BankAccountGroup? @relation(fields: [groupId], references: [id])
+  bamHostId       String?
+  bamHost         BamHost?  @relation(fields: [bamHostId], references: [id])
+  status          BankAccountStatus @default(ACTIVE)
+  isAllocated     Boolean   @default(false)
+  allocatedTo     String?
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+
+  deposits        Deposit[]
+
+  @@map("bank_accounts")
+}
+
+enum BankAccountStatus {
+  ACTIVE
+  INACTIVE
+  SUSPENDED
+}
+
+model BankAccountGroup {
+  id          String   @id @default(cuid())
+  name        String
+  description String?
+  accounts    BankAccount[]
+  createdAt   DateTime @default(now())
+
+  @@map("bank_account_groups")
+}
+
+model BamHost {
+  id          String   @id @default(cuid())
+  name        String
+  host        String
+  port        Int      @default(8080)
+  status      String   @default("active")
+  accounts    BankAccount[]
+  createdAt   DateTime @default(now())
+
+  @@map("bam_hosts")
+}
+
+model Bank {
+  id          String   @id @default(cuid())
+  code        String   @unique
+  name        String
+  accounts    BankAccount[]
+  createdAt   DateTime @default(now())
+
+  @@map("banks")
+}
+
+model Channel {
+  id          String   @id @default(cuid())
+  code        String   @unique
+  name        String
+  type        ChannelType
+  status      String   @default("active")
+  settings    Json?
+  deposits    Deposit[]
+  withdraws   Withdraw[]
+  payments    Payment[]
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@map("channels")
+}
+
+enum ChannelType {
+  DEPOSIT
+  WITHDRAW
+  BOTH
+}
+
+model ChannelSetting {
+  id          String   @id @default(cuid())
+  channelId   String
+  channel     Channel  @relation(fields: [channelId], references: [id])
+  key         String
+  value       String
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@unique([channelId, key])
+  @@map("channel_settings")
+}
+
+model AgentChannelConfig {
+  id          String    @id @default(cuid())
+  agentId     String
+  channelId   String
+  channel     Channel   @relation(fields: [channelId], references: [id])
+  feeGroupId  String?
+  feeGroup    FeeGroup? @relation(fields: [feeGroupId], references: [id])
+  status      String    @default("active")
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  @@unique([agentId, channelId])
+  @@map("agent_channel_configs")
+}
+
+model UserChannelConfig {
+  id          String    @id @default(cuid())
+  userId      String
+  user        User      @relation(fields: [userId], references: [id])
+  channelId   String
+  feeGroupId  String?
+  feeGroup    FeeGroup? @relation(fields: [feeGroupId], references: [id])
+  status      String    @default("active")
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  @@unique([userId, channelId])
+  @@map("user_channel_configs")
+}
+
+model Payment {
+  id          String   @id @default(cuid())
+  channelId   String
+  channel     Channel  @relation(fields: [channelId], references: [id])
+  name        String
+  code        String
+  config      Json?
+  status      String   @default("active")
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@map("payments")
+}
+
+model FeeGroup {
+  id          String   @id @default(cuid())
+  name        String
+  description String?
+  rules       FeeRule[]
+  agentConfigs AgentChannelConfig[]
+  userConfigs  UserChannelConfig[]
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@map("fee_groups")
+}
+
+model FeeRule {
+  id              String      @id @default(cuid())
+  feeGroupId      String
+  feeGroup        FeeGroup    @relation(fields: [feeGroupId], references: [id])
+  channelId       String
+  type            FeeType
+  value           Decimal     // 百分比或固定金額
+  minAmount       Decimal?
+  maxAmount       Decimal?
+  status          String      @default("active")
+  priority        Int         @default(0)
+  createdAt       DateTime    @default(now())
+  updatedAt       DateTime    @updatedAt
+
+  @@map("fee_rules")
+}
+
+enum FeeType {
+  PERCENTAGE
+  FIXED
+}
+
+model AgentCommission {
+  id              String   @id @default(cuid())
+  agentId         String
+  depositId       String?
+  withdrawId      String?
+  level           Int
+  rate            Decimal
+  amount          Decimal
+  status          String   @default("pending")
+  createdAt      DateTime @default(now())
+  settledAt       DateTime?
+
+  @@map("agent_commissions")
+}
+
+model AgentCommissionSnapshot {
+  id          String   @id @default(cuid())
+  agentId     String
+  period      String   // YYYY-MM
+  totalAmount Decimal  @default(0)
+  settled     Boolean  @default(false)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@unique([agentId, period])
+  @@map("agent_commission_snapshots")
+}
+
+model Blacklist {
+  id          String   @id @default(cuid())
+  type        BlacklistType
+  value       String
+  reason      String?
+  createdAt   DateTime @default(now())
+  createdBy   String?
+
+  @@map("blacklists")
+}
+
+enum BlacklistType {
+  ID_CARD
+  BANK_ACCOUNT
+  PHONE
+  IP
+  DEVICE_ID
+}

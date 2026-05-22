@@ -62,3 +62,4 @@ coverage/
 *.local
 *.bak
 *.tmp
+/app/generated/prisma
