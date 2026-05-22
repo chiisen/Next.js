@@ -1,8 +1,5 @@
-import { test as base } from "vitest";
-import type { NextRequest } from "next/server";
-
-// Mock NextAuth for testing
-const mockSession = {
+// Mock session for testing
+export const mockSession = {
   user: {
     id: "test-user-id",
     email: "test@example.com",
@@ -10,10 +7,3 @@ const mockSession = {
     role: "MERCHANT",
   },
 };
-
-export const test = base.extend({
-  // Mock auth for authenticated requests
-  authRequest: async () => mockSession,
-});
-
-export { mockSession };
