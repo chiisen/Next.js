@@ -10,111 +10,172 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
+// ============================================================================
+// 用戶體系 (User)
+// ============================================================================
+
 model User {
+  // 使用者唯一識別碼
   id            String    @id @default(cuid())
+  // 登入電子郵件（不可重複）
   email         String    @unique
+  // 密碼（bcrypt 雜湊後儲存）
   password      String
+  // 顯示名稱
   name          String?
+  // 身份角色：MERCHANT(商戶)、AGENT(代理)、SUPER_AGENT(超級代理)、ADMIN(管理員)
   role          UserRole  @default(MERCHANT)
+  // 上層代理商 ID（用於代理階層鏈）
   parentId      String?
   parent        User?     @relation("UserHierarchy", fields: [parentId], references: [id])
   children      User[]    @relation("UserHierarchy")
+  // 可用餘額
   balance       Decimal   @default(0)
+  // 冻结餘額（提領中、風控冻结等）
   frozenBalance Decimal   @default(0)
   createdAt     DateTime  @default(now())
   updatedAt     DateTime  @updatedAt
 
   deposits              Deposit[]
   withdraws             Withdraw[]
-  cashBooks             CashBook[]
+  cashBooks              CashBook[]
   userChannelConfigs    UserChannelConfig[]
 
   @@map("users")
 }
 
 enum UserRole {
-  MERCHANT
-  AGENT
-  SUPER_AGENT
-  ADMIN
+  MERCHANT     // 商戶
+  AGENT        // 代理商
+  SUPER_AGENT  // 超級代理商
+  ADMIN        // 系統管理員
 }
 
+// ============================================================================
+// 代收 (Deposit)
+// ============================================================================
+
 model Deposit {
+  // 代收唯一識別碼
   id              String        @id @default(cuid())
+  // 訂單編號（系統產生，確保唯一）
   orderNo         String        @unique
+  // 所屬商戶 ID
   merchantId      String
   merchant        User          @relation(fields: [merchantId], references: [id])
+  // 收款金額
   amount          Decimal
+  // 幣別（預設 TWD 新台幣）
   currency        String        @default("TWD")
+  // 狀態：PENDING(待匹配) → MATCHING(匹配中) → COMPLETED(完成) / FAILED(失敗) / CANCELLED(取消)
   status          DepositStatus @default(PENDING)
+  // 分配的銀行帳號 ID
   bankAccountId   String?
   bankAccount     BankAccount?  @relation(fields: [bankAccountId], references: [id])
+  // 支付通道 ID（用於區分不同支付方式）
   channelId       String?
   channel         Channel?      @relation(fields: [channelId], references: [id])
+  // 商戶回調 URL（交易完成後通知）
   callbackUrl     String?
+  // 回調結果狀態（JSON 格式）
   callbackStatus  String?
+  // UTR (Unique Transaction Reference) - 銀行轉帳交易序號
   utr             String?
+  // 匯款人姓名
   payerName       String?
   createdAt       DateTime      @default(now())
   updatedAt       DateTime      @updatedAt
+  // 匹配時間
   matchedAt       DateTime?
+  // 完成時間
   completedAt     DateTime?
 
   @@map("deposits")
 }
 
 enum DepositStatus {
-  PENDING
-  MATCHING
-  COMPLETED
-  FAILED
-  CANCELLED
+  PENDING     // 待匹配（等待客戶轉帳）
+  MATCHING    // 匹配中（偵測到轉帳，待確認）
+  COMPLETED   // 已完成
+  FAILED      // 失敗
+  CANCELLED   // 已取消
 }
 
+// ============================================================================
+// 代付 (Withdraw)
+// ============================================================================
+
 model Withdraw {
+  // 代付唯一識別碼
   id            String          @id @default(cuid())
+  // 訂單編號
   orderNo       String          @unique
+  // 所屬商戶 ID
   merchantId    String
   merchant      User            @relation(fields: [merchantId], references: [id])
+  // 提領金額
   amount        Decimal
+  // 幣別
   currency      String          @default("TWD")
-  status        WithdrawStatus @default(PENDING)
+  // 狀態：PENDING_REVIEW(待審核) → APPROVED(核准) → PROCESSING(處理中) → COMPLETED(完成) / REJECTED(駁回) / FAILED(失敗)
+  status        WithdrawStatus @default(PENDING_REVIEW)
+  // 目標銀行帳號 ID（可選）
   bankAccountId String?
+  // 支付通道 ID
   channelId     String?
   channel       Channel?        @relation(fields: [channelId], references: [id])
+  // 商戶回調 URL
   callbackUrl   String?
+  // 銀行名稱
   bankName      String?
+  // 銀行帳號
   bankAccount   String?
+  // 帳戶名稱
   accountName   String?
   createdAt     DateTime        @default(now())
   updatedAt     DateTime        @updatedAt
+  // 審核時間
   reviewedAt    DateTime?
+  // 審核人 ID
   reviewedBy    String?
+  // 完成時間
   completedAt   DateTime?
 
   @@map("withdraws")
 }
 
 enum WithdrawStatus {
-  PENDING
-  PENDING_REVIEW
-  APPROVED
-  REJECTED
-  PROCESSING
-  COMPLETED
-  FAILED
+  PENDING_REVIEW  // 待審核（需管理員核准）
+  APPROVED        // 已核准
+  REJECTED        // 已駁回
+  PROCESSING      // 處理中（已向第三方發起）
+  COMPLETED       // 已完成
+  FAILED          // 失敗
 }
 
+// ============================================================================
+// 現金帳本 (CashBook)
+// ============================================================================
+
 model CashBook {
+  // 流水唯一識別碼
   id          String      @id @default(cuid())
+  // 所屬用戶 ID
   userId      String
   user        User        @relation(fields: [userId], references: [id])
+  // 類型：DEPOSIT(存款)、WITHDRAW(提款)、COMMISSION(佣金)、ADJUSTMENT(調整)、FREEZE(凍結)、UNFREEZE(解凍)
   type        CashBookType
+  // 變動金額
   amount      Decimal
+  // 變動前餘額
   balanceBefore Decimal
+  // 變動後餘額
   balanceAfter  Decimal
+  // 關聯類型（例：deposit, withdraw）
   refType     String?
+  // 關聯 ID
   refId       String?
+  // 備註
   note        String?
   createdAt   DateTime    @default(now())
   cashRecords CashRecord[]
@@ -123,37 +184,58 @@ model CashBook {
 }
 
 enum CashBookType {
-  DEPOSIT
-  WITHDRAW
-  COMMISSION
-  ADJUSTMENT
-  FREEZE
-  UNFREEZE
+  DEPOSIT     // 存款
+  WITHDRAW    // 提款
+  COMMISSION  // 佣金
+  ADJUSTMENT  // 調整
+  FREEZE      // 凍結
+  UNFREEZE    // 解凍
 }
 
+// ============================================================================
+// 現金記錄明細 (CashRecord)
+// ============================================================================
+
 model CashRecord {
+  // 記錄唯一識別碼
   id          String   @id @default(cuid())
+  // 所屬帳本 ID
   cashBookId  String
   cashBook    CashBook @relation(fields: [cashBookId], references: [id])
+  // 類型
   type        String
+  // 金額
   amount      Decimal
   createdAt   DateTime @default(now())
 
   @@map("cash_records")
 }
 
+// ============================================================================
+// 銀行帳號體系
+// ============================================================================
+
 model BankAccount {
+  // 帳號唯一識別碼
   id              String    @id @default(cuid())
+  // 銀行帳號
   accountNo       String    @unique
+  // 帳戶名稱
   accountName     String
+  // 銀行 ID
   bankId          String
   bank            Bank      @relation(fields: [bankId], references: [id])
+  // 所屬帳號群組 ID
   groupId         String?
   group           BankAccountGroup? @relation(fields: [groupId], references: [id])
+  // 監控主機 ID
   bamHostId       String?
   bamHost         BamHost?  @relation(fields: [bamHostId], references: [id])
+  // 狀態：ACTIVE(可用)、INACTIVE(停用)、SUSPENDED(凍結)
   status          BankAccountStatus @default(ACTIVE)
+  // 是否已分配給商戶
   isAllocated     Boolean   @default(false)
+  // 分配給的商戶 ID
   allocatedTo     String?
   createdAt       DateTime  @default(now())
   updatedAt       DateTime  @updatedAt
@@ -164,14 +246,17 @@ model BankAccount {
 }
 
 enum BankAccountStatus {
-  ACTIVE
-  INACTIVE
-  SUSPENDED
+  ACTIVE     // 可用
+  INACTIVE   // 停用
+  SUSPENDED  // 凍結
 }
 
 model BankAccountGroup {
+  // 群組唯一識別碼
   id          String   @id @default(cuid())
+  // 群組名稱
   name        String
+  // 群組描述
   description String?
   accounts    BankAccount[]
   createdAt   DateTime @default(now())
@@ -180,10 +265,15 @@ model BankAccountGroup {
 }
 
 model BamHost {
+  // 主機唯一識別碼
   id          String   @id @default(cuid())
+  // 主機名稱
   name        String
+  // 主機位址
   host        String
+  // 連接埠
   port        Int      @default(8080)
+  // 狀態
   status      String   @default("active")
   accounts    BankAccount[]
   createdAt   DateTime @default(now())
@@ -192,8 +282,11 @@ model BamHost {
 }
 
 model Bank {
+  // 銀行唯一識別碼
   id          String   @id @default(cuid())
+  // 銀行代碼
   code        String   @unique
+  // 銀行名稱
   name        String
   accounts    BankAccount[]
   createdAt   DateTime @default(now())
@@ -201,12 +294,22 @@ model Bank {
   @@map("banks")
 }
 
+// ============================================================================
+// 支付通道 (Channel)
+// ============================================================================
+
 model Channel {
+  // 通道唯一識別碼
   id          String   @id @default(cuid())
+  // 通道代碼（如：paypay, hk21pay, vanpay, colapay）
   code        String   @unique
+  // 通道名稱
   name        String
+  // 類型：DEPOSIT(代收)、WITHDRAW(代付)、BOTH(兩者皆可)
   type        ChannelType
+  // 狀態
   status      String   @default("active")
+  // 額外設定（JSON 格式）
   settings    Json?
   deposits    Deposit[]
   withdraws   Withdraw[]
@@ -220,16 +323,20 @@ model Channel {
 }
 
 enum ChannelType {
-  DEPOSIT
-  WITHDRAW
-  BOTH
+  DEPOSIT   // 代收
+  WITHDRAW  // 代付
+  BOTH      // 兩者
 }
 
 model ChannelSetting {
+  // 設定唯一識別碼
   id          String   @id @default(cuid())
+  // 通道 ID
   channelId   String
   channel     Channel  @relation(fields: [channelId], references: [id])
+  // 設定鍵
   key         String
+  // 設定值
   value       String
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
@@ -239,12 +346,17 @@ model ChannelSetting {
 }
 
 model AgentChannelConfig {
+  // 設定唯一識別碼
   id          String    @id @default(cuid())
+  // 代理商 ID
   agentId     String
+  // 通道 ID
   channelId   String
   channel     Channel   @relation(fields: [channelId], references: [id])
+  // 費率群組 ID
   feeGroupId  String?
   feeGroup    FeeGroup? @relation(fields: [feeGroupId], references: [id])
+  // 狀態
   status      String    @default("active")
   createdAt   DateTime  @default(now())
   updatedAt   DateTime  @updatedAt
@@ -254,12 +366,17 @@ model AgentChannelConfig {
 }
 
 model UserChannelConfig {
+  // 設定唯一識別碼
   id          String    @id @default(cuid())
+  // 用戶 ID
   userId      String
   user        User      @relation(fields: [userId], references: [id])
+  // 通道 ID
   channelId   String
+  // 費率群組 ID
   feeGroupId  String?
   feeGroup    FeeGroup? @relation(fields: [feeGroupId], references: [id])
+  // 狀態
   status      String    @default("active")
   createdAt   DateTime  @default(now())
   updatedAt   DateTime  @updatedAt
@@ -269,12 +386,18 @@ model UserChannelConfig {
 }
 
 model Payment {
+  // 支付工具唯一識別碼
   id          String   @id @default(cuid())
+  // 通道 ID
   channelId   String
   channel     Channel  @relation(fields: [channelId], references: [id])
+  // 支付工具名稱
   name        String
+  // 支付工具代碼
   code        String
+  // 設定（JSON 格式）
   config      Json?
+  // 狀態
   status      String   @default("active")
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
@@ -282,9 +405,16 @@ model Payment {
   @@map("payments")
 }
 
+// ============================================================================
+// 費率引擎 (Fee)
+// ============================================================================
+
 model FeeGroup {
+  // 費率群組唯一識別碼
   id          String   @id @default(cuid())
+  // 費率群組名稱
   name        String
+  // 費率群組描述
   description String?
   rules       FeeRule[]
   agentConfigs AgentChannelConfig[]
@@ -297,15 +427,24 @@ model FeeGroup {
 }
 
 model FeeRule {
+  // 費率規則唯一識別碼
   id              String      @id @default(cuid())
+  // 所屬費率群組 ID
   feeGroupId      String
   feeGroup        FeeGroup    @relation(fields: [feeGroupId], references: [id])
+  // 適用通道 ID
   channelId       String
+  // 類型：PERCENTAGE(百分比)、FIXED(固定金額)
   type            FeeType
-  value           Decimal     // 百分比或固定金額
+  // 費率值（百分比時為 0-100，固定金額時為具體數字）
+  value           Decimal
+  // 最低金額門檻（可選）
   minAmount       Decimal?
+  // 最高金額上限（可選）
   maxAmount       Decimal?
+  // 狀態
   status          String      @default("active")
+  // 優先級（數字越大越優先）
   priority        Int         @default(0)
   createdAt       DateTime    @default(now())
   updatedAt       DateTime    @updatedAt
@@ -314,32 +453,51 @@ model FeeRule {
 }
 
 enum FeeType {
-  PERCENTAGE
-  FIXED
+  PERCENTAGE  // 百分比收費
+  FIXED       // 固定金額
 }
 
+// ============================================================================
+// 代理佣金 (Agent Commission)
+// ============================================================================
+
 model AgentCommission {
+  // 佣金唯一識別碼
   id              String   @id @default(cuid())
+  // 代理商 ID
   agentId         String
+  // 關聯代收 ID
   depositId       String?
+  // 關聯代付 ID
   withdrawId      String?
+  // 佣金的層級（1, 2, 3）
   level           Int
+  // 費率
   rate            Decimal
+  // 佣金金額
   amount          Decimal
+  // 狀態
   status          String   @default("pending")
+  // 費率群組 ID
   feeGroupId      String?
   feeGroup        FeeGroup? @relation(fields: [feeGroupId], references: [id])
-  createdAt      DateTime @default(now())
+  createdAt       DateTime @default(now())
+  // 結算時間
   settledAt       DateTime?
 
   @@map("agent_commissions")
 }
 
 model AgentCommissionSnapshot {
+  // 快照唯一識別碼
   id          String   @id @default(cuid())
+  // 代理商 ID
   agentId     String
-  period      String   // YYYY-MM
+  // 結算週期（YYYY-MM）
+  period      String
+  // 總佣金金額
   totalAmount Decimal  @default(0)
+  // 是否已結算
   settled     Boolean  @default(false)
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
@@ -348,21 +506,30 @@ model AgentCommissionSnapshot {
   @@map("agent_commission_snapshots")
 }
 
+// ============================================================================
+// 風控 (Risk Control)
+// ============================================================================
+
 model Blacklist {
+  // 黑名單唯一識別碼
   id          String   @id @default(cuid())
+  // 類型：ID_CARD(身份證)、BANK_ACCOUNT(銀行帳號)、PHONE(手機)、IP(IP 地址)、DEVICE_ID(設備 ID)
   type        BlacklistType
+  // 具體值
   value       String
+  // 加入原因
   reason      String?
   createdAt   DateTime @default(now())
+  // 加入操作者 ID
   createdBy   String?
 
   @@map("blacklists")
 }
 
 enum BlacklistType {
-  ID_CARD
-  BANK_ACCOUNT
-  PHONE
-  IP
-  DEVICE_ID
+  ID_CARD      // 身份證
+  BANK_ACCOUNT // 銀行帳號
+  PHONE        // 手機號碼
+  IP           // IP 地址
+  DEVICE_ID    // 設備 ID
 }
