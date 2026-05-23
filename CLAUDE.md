@@ -68,3 +68,34 @@ next-js/
 3. 實作認證層
 4. 建立商業邏輯模組
 5. 串接支付通道
+
+## CodeGraph 整合
+
+本專案已啟用 [CodeGraph](https://github.com/colbymchenry/codegraph) 代碼知識圖譜，可快速查詢代碼結構。
+
+### 常用指令
+
+```bash
+codegraph status          # 查看索引狀態
+codegraph query <關鍵字>   # 搜尋符號/函式
+codegraph callers <函式>   # 查誰呼叫某函式
+codegraph callees <函式>   # 查函式呼叫誰
+codegraph impact <函式>   # 分析影響範圍
+codegraph serve --mcp     # 啟動 MCP 伺服器（供 AI 使用）
+```
+
+### MCP 工具（AI 使用）
+
+當 MCP 伺服器運行時，AI 可使用以下工具：
+- `codegraph_search` — 搜尋符號
+- `codegraph_context` — 建構上下文
+- `codegraph_callers` / `codegraph_callees` — 呼叫圖分析
+- `codegraph_impact` — 影響範圍分析
+- `codegraph_explore` — 探索程式碼關係
+
+### 建議使用時機
+
+- 探索不熟悉的程式碼時
+- 修改函式前查詢呼叫關係
+- 重構前分析影響範圍
+- 快速定位符號定義
